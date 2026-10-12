@@ -1,0 +1,289 @@
+using System.Numerics;
+using System.Runtime.InteropServices;
+using Dalamud.Bindings.ImGui;
+using DutyHuddle.Configuration;
+using DutyHuddle.Domain.Duty;
+using DutyHuddle.Domain.Models;
+using DutyHuddle.Domain.Time;
+using DutyHuddle.GameAdapters;
+using DutyHuddle.Services;
+using DutyHuddle.Sync;
+using DutyHuddle.UI;
+using DutyHuddle.UI.Pages;
+using DutyHuddle.UiPreview;
+using Lumina;
+using Lumina.Data;
+using Lumina.Data.Files;
+using Lumina.Excel;
+
+// Usage: DutyHuddle.UiPreview [output folder] [game install folder] [height]
+var output = Path.GetFullPath(args.Length > 0 ? args[0] : "artifacts/ui-preview");
+var install = args.Length > 1 ? args[1] : @"C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY XIV Online";
+Directory.CreateDirectory(output);
+
+using var game = new GameData(Path.Combine(install, "game", "sqpack"), new LuminaOptions { PanicOnSheetChecksumMismatch = false, DefaultExcelLanguage = Language.English });
+var repository = new GameDataRepository(new LuminaSheetSource(game));
+var catalog = repository.Load();
+var resolver = new WtObjectiveResolver(catalog);
+
+var width = 1000;
+var height = args.Length > 2 ? int.Parse(args[2]) : 720;
+
+ImGui.CreateContext();
+var io = ImGui.GetIO();
+unsafe
+{
+    io.IniFilename = null;
+}
+
+io.DisplaySize = new Vector2(width, height);
+io.DeltaTime = 1f / 60f;
+io.MousePos = new Vector2(-10000, -10000);
+
+var textures = new Dictionary<ulong, CpuTexture>();
+var assets = new PreviewAssets(io, game, textures);
+var ui = new Widgets(assets);
+
+// Sample party: you, two friends who share, one who does not run the plugin.
+var config = new PluginConfig { ShareWithParty = true };
+var store = Scenario.Build(catalog, resolver);
+var analysis = new AnalysisService(store, config, catalog, resolver);
+var solvers = new SolverCache(null!);
+var sharing = new FakeSharing();
+var finder = new NoDutyFinder();
+var view = new MainView(
+    ui,
+    config,
+    () => { },
+    sharing,
+    new RoulettePage(ui, config, () => { }, finder, new FakeHistory()),
+    new WondrousTailsPage(ui, config, () => { }, catalog, repository.LoadExpansionNames(), finder, solvers),
+    new SharingPage(ui, config, () => { }, sharing),
+    () => { });
+
+// Let the solver finish before rendering the journal page.
+while (solvers.TryGet(config.AdvisorGoal) is null)
+    Thread.Sleep(50);
+
+foreach (var (page, name, shareOn) in new[]
+         {
+             (MainView.RoulettesPage, "roulettes", true),
+             (MainView.WondrousTailsPage, "wondrous-tails", true),
+             (MainView.SharingPage, "sharing", true),
+             (MainView.RoulettesPage, "roulettes-sharing-off", false),
+         })
+{
+    config.SelectedPage = page;
+    config.ShareWithParty = shareOn;
+    sharing.State = shareOn ? SharingState.Connected : SharingState.Off;
+    ImDrawDataPtr drawData = default;
+    for (var frame = 0; frame < 4; frame++)
+    {
+        io.DisplaySize = new Vector2(width, height);
+        ImGui.NewFrame();
+        ImGui.SetNextWindowPos(new Vector2(16, 16));
+        ImGui.SetNextWindowSize(new Vector2(width - 32, height - 32));
+        using (Theme.PushWindowStyle())
+        {
+            ImGui.Begin("DutyHuddle###main", ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings);
+            view.Draw(analysis.Current);
+            ImGui.End();
+        }
+
+        ImGui.Render();
+        drawData = ImGui.GetDrawData();
+    }
+
+    var rasterizer = new Rasterizer(width, height, new Vector4(0.23f, 0.26f, 0.30f, 1f), textures);
+    rasterizer.Render(drawData);
+    var path = Path.Combine(output, $"{name}.png");
+    rasterizer.SavePng(path);
+    Console.WriteLine($"Saved {path}");
+}
+
+return 0;
+
+internal sealed class LuminaSheetSource(GameData game) : ISheetSource
+{
+    public ExcelSheet<T> GetSheet<T>()
+        where T : struct, IExcelRow<T>
+        => game.GetExcelSheet<T>(Language.English)!;
+}
+
+/// <summary>Fonts from Dalamud's own assets (Noto Sans, Font Awesome) plus Arial Narrow for the game's Trump Gothic.</summary>
+internal sealed unsafe class PreviewAssets : IUiAssets
+{
+    private static readonly ushort[] IconRanges = [0xE000, 0xF8FF, 0];
+
+    private readonly GameData game;
+    private readonly Dictionary<ulong, CpuTexture> textures;
+    private readonly Dictionary<uint, ImTextureID?> icons = [];
+    private readonly ImFontPtr iconFont;
+    private readonly ImFontPtr titleFont;
+    private readonly ImFontPtr heroFont;
+    private readonly GCHandle iconRanges;
+    private ulong nextHandle = 1000;
+
+    public PreviewAssets(ImGuiIOPtr io, GameData game, Dictionary<ulong, CpuTexture> textures)
+    {
+        this.game = game;
+        this.textures = textures;
+        var assetsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XIVLauncher", "dalamudAssets", "dev", "UIRes");
+        var fonts = io.Fonts;
+        fonts.AddFontFromFileTTF(Path.Combine(assetsDir, "NotoSansCJKjp-Medium.otf"), 17f, default, fonts.GetGlyphRangesDefault());
+        iconRanges = GCHandle.Alloc(IconRanges, GCHandleType.Pinned);
+        iconFont = fonts.AddFontFromFileTTF(Path.Combine(assetsDir, "FontAwesomeFreeSolid.otf"), 15f, default, (ushort*)iconRanges.AddrOfPinnedObject());
+        titleFont = fonts.AddFontFromFileTTF(@"C:\Windows\Fonts\ARIALN.TTF", 23f, default, fonts.GetGlyphRangesDefault());
+        heroFont = fonts.AddFontFromFileTTF(@"C:\Windows\Fonts\ARIALN.TTF", 34f, default, fonts.GetGlyphRangesDefault());
+        fonts.Build();
+
+        for (var i = 0; i < fonts.Textures.Size; i++)
+        {
+            byte* pixels;
+            int w, h, bpp;
+            fonts.GetTexDataAsRGBA32(i, &pixels, &w, &h, &bpp);
+            var data = new byte[w * h * 4];
+            Marshal.Copy((nint)pixels, data, 0, data.Length);
+            var handle = (ulong)(i + 1);
+            textures[handle] = new CpuTexture(w, h, data);
+            fonts.SetTexID(i, new ImTextureID(handle));
+        }
+    }
+
+    public float Scale => 1f;
+
+    public ImTextureID? GetGameIcon(uint iconId)
+    {
+        if (icons.TryGetValue(iconId, out var cached))
+            return cached;
+
+        ImTextureID? result = null;
+        var folder = iconId / 1000 * 1000;
+        var tex = game.GetFile<TexFile>($"ui/icon/{folder:D6}/{iconId:D6}_hr1.tex") ?? game.GetFile<TexFile>($"ui/icon/{folder:D6}/{iconId:D6}.tex");
+        if (tex is not null)
+        {
+            var bgra = tex.ImageData;
+            var rgba = new byte[bgra.Length];
+            for (var i = 0; i < bgra.Length; i += 4)
+            {
+                rgba[i] = bgra[i + 2];
+                rgba[i + 1] = bgra[i + 1];
+                rgba[i + 2] = bgra[i];
+                rgba[i + 3] = bgra[i + 3];
+            }
+
+            var handle = nextHandle++;
+            textures[handle] = new CpuTexture(tex.Header.Width, tex.Header.Height, rgba);
+            result = new ImTextureID(handle);
+        }
+
+        icons[iconId] = result;
+        return result;
+    }
+
+    public IDisposable IconFont() => Push(iconFont);
+
+    public IDisposable TitleFont() => Push(titleFont);
+
+    public IDisposable HeroFont() => Push(heroFont);
+
+    private static IDisposable Push(ImFontPtr font)
+    {
+        ImGui.PushFont(font);
+        return new Popper();
+    }
+
+    private sealed class Popper : IDisposable
+    {
+        public void Dispose() => ImGui.PopFont();
+    }
+}
+
+internal sealed class FakeSharing : ISharing
+{
+    public SharingState State { get; set; } = SharingState.Connected;
+
+    public string Status => State == SharingState.Off ? "Sharing off" : "Sharing on";
+
+    public bool HasServer => true;
+
+    public string? BuildShareMessage(DateTime nowUtc) => null;
+
+    public void ForgetReceived()
+    {
+    }
+}
+
+internal sealed class NoDutyFinder : IDutyFinder
+{
+    public void OpenDuty(uint contentFinderConditionId)
+    {
+    }
+
+    public void OpenRoulette(uint rouletteId)
+    {
+    }
+}
+
+internal sealed class FakeHistory : IRouletteHistory
+{
+    public IReadOnlyList<(DateOnly Day, IReadOnlySet<uint> Roulettes)> Recent(MemberId member, int count) => [];
+}
+
+/// <summary>A four-person party with realistic roulettes and journals drawn from real objectives.</summary>
+internal static class Scenario
+{
+    public static PartyStateStore Build(DutyCatalog catalog, WtObjectiveResolver resolver)
+    {
+        var now = DateTime.UtcNow;
+        var epoch = GameClock.DailyEpoch(now);
+        var lyra = new MemberId("Lyra Moonveil", 1);
+        var kaia = new MemberId("Kaia Stormborn", 1);
+        var rhen = new MemberId("Rhen Ashford", 1);
+        var mira = new MemberId("Mira Vael", 1);
+
+        var store = new PartyStateStore();
+        store.SetMembers(
+        [
+            new PartyMemberInfo(lyra, 1, true, 24),
+            new PartyMemberInfo(kaia, 2, false, 19),
+            new PartyMemberInfo(rhen, 3, false, 25),
+            new PartyMemberInfo(mira, 4, false, 38),
+        ]);
+
+        // Roulette ids: 1 Leveling, 2 High-level, 3 MSQ, 4 Guildhests, 5 Expert, 6 Trials, 7 Frontline, 8 Level Cap, 9 Mentor, 15 Alliance, 17 Normal raids.
+        var lyraRoulettes = States("1A 2A 3C 4C 5C 6A 7A 8A 9L 15A 17A");
+        var kaiaRoulettes = States("1C 2A 3C 4A 5A 6A 7A 8C 9L 15A 17C");
+        var rhenRoulettes = States("1A 2C 3A 4A 5A 6A 7A 8C 9A 15C 17A");
+
+        // The local journal reproduces the design mockup: seven spread seals, four points.
+        const ushort spread = (1 << 0) | (1 << 2) | (1 << 5) | (1 << 7) | (1 << 8) | (1 << 10) | (1 << 13);
+        store.SetLocal(new MemberSnapshot(lyra, now, epoch, lyraRoulettes,
+            Board([109, 190, 173, 165, 157, 54, 1, 3, 4, 59, 60, 85, 86, 108, 121, 46], open: 9, spread, points: 4, now), SnapshotSource.Local));
+        store.UpdateRemote(new MemberSnapshot(kaia, now.AddMinutes(-2), epoch, kaiaRoulettes,
+            Board([109, 173, 1, 158, 52, 165, 59, 60, 85, 86, 108, 121, 122, 123, 124, 125], open: 9, 0b0000_0000_0111_1111, points: 1, now), SnapshotSource.Relay));
+        store.UpdateRemote(new MemberSnapshot(rhen, now.AddMinutes(-11), epoch, rhenRoulettes,
+            Board([165, 173, 157, 46, 53, 109, 2, 3, 4, 59, 60, 85, 86, 108, 121, 122], open: 13, 0b0000_0000_0000_0111, points: 6, now), SnapshotSource.ChatCode));
+        return store;
+    }
+
+    private static Dictionary<uint, Availability> States(string spec)
+        => spec.Split(' ').ToDictionary(
+            s => uint.Parse(s[..^1]),
+            s => s[^1] switch { 'A' => Availability.Available, 'C' => Availability.Completed, 'L' => Availability.Locked, _ => Availability.Unknown });
+
+    private static WtBoard Board(byte[] orders, int open, ushort stickers, byte points, DateTime now)
+    {
+        var status = new WtTaskStatus[16];
+        for (var i = 0; i < 16; i++)
+            status[i] = i < open ? WtTaskStatus.Open : WtTaskStatus.Claimed;
+        return new WtBoard
+        {
+            OrderIds = orders,
+            Status = status,
+            StickerMask = stickers,
+            SecondChancePoints = points,
+            ExpiresUtc = now.AddDays(5).AddHours(7),
+        };
+    }
+}

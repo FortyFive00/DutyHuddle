@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Renders the plugin's real UI code to PNG files without the game: a plain ImGui context (Dalamud's own
+    native cimgui), sample party data, game icons read with Lumina, and a small CPU rasterizer.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DalamudLibPath Condition="'$(DalamudLibPath)' == ''">$(AppData)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DutyHuddle\DutyHuddle.csproj" />
+    <ProjectReference Include="..\..\src\DutyHuddle.Domain\DutyHuddle.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Dalamud" HintPath="$(DalamudLibPath)Dalamud.dll" />
+    <Reference Include="Dalamud.Bindings.ImGui" HintPath="$(DalamudLibPath)Dalamud.Bindings.ImGui.dll" />
+    <Reference Include="HexaGen.Runtime" HintPath="$(DalamudLibPath)HexaGen.Runtime.dll" />
+    <Reference Include="Lumina" HintPath="$(DalamudLibPath)Lumina.dll" />
+    <Reference Include="Lumina.Excel" HintPath="$(DalamudLibPath)Lumina.Excel.dll" />
+    <None Include="$(DalamudLibPath)cimgui.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+</Project>

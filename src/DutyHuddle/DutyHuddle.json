@@ -1,0 +1,19 @@
+{
+  "Author": "DutyHuddle",
+  "Name": "DutyHuddle",
+  "Punchline": "Roulettes and Wondrous Tails for your party.",
+  "Description": "Compare daily roulettes and Wondrous Tails with your party, and get advice on your journal.",
+  "ApplicableVersion": "any",
+  "Tags": [
+    "party",
+    "roulette",
+    "wondrous tails",
+    "UI"
+  ],
+  "CategoryTags": [
+    "utility",
+    "ui"
+  ],
+  "AcceptsFeedback": false,
+  "RepoUrl": "https://github.com/FortyFive00/DutyHuddle"
+}

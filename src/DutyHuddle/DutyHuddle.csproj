@@ -1,0 +1,16 @@
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+
+  <PropertyGroup>
+    <Description>See which roulettes and Wondrous Tails duties your party has in common.</Description>
+    <PackageProjectUrl>https://github.com/FortyFive00/DutyHuddle</PackageProjectUrl>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>DutyHuddle</RootNamespace>
+    <!-- Same output folder whether built alone or from the solution (which builds it as x64). -->
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DutyHuddle.Domain\DutyHuddle.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

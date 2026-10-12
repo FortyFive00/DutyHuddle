@@ -1,0 +1,13 @@
+{
+  "name": "dutyhuddle-relay-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "deploy": "wrangler deploy",
+    "smoke": "node test/smoke.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "4.143.1"
+  }
+}

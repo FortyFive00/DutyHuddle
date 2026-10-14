@@ -69,7 +69,7 @@ public sealed class MainView
     private void DrawHeader(PartyView view)
     {
         var startY = ImGui.GetCursorPosY();
-        DrawLogo(Theme.S(30));
+        Widgets.Logo(Theme.S(30));
         ImGui.SameLine(0, Theme.S(10));
         ImGui.BeginGroup();
         ui.Title("DutyHuddle", Theme.Gold);
@@ -177,26 +177,5 @@ public sealed class MainView
         var textSize = ImGui.CalcTextSize(label);
         draw.AddText(origin + new Vector2(Theme.S(12) + iconSize.X + Theme.S(8), (height - textSize.Y) / 2), Theme.U32(Theme.Text), label);
         return clicked;
-    }
-
-    /// <summary>The DutyHuddle mark: a tiny Wondrous Tails board with one golden line.</summary>
-    private static void DrawLogo(float size)
-    {
-        var origin = ImGui.GetCursorScreenPos() + new Vector2(0, Theme.S(4));
-        var draw = ImGui.GetWindowDrawList();
-        draw.AddRectFilled(origin, origin + new Vector2(size), Theme.U32(Theme.Rgba(26, 34, 56)), size * 0.22f);
-        var gap = size * 0.06f;
-        var cell = (size - gap * 5) / 4;
-        for (var r = 0; r < 4; r++)
-        {
-            for (var c = 0; c < 4; c++)
-            {
-                var min = origin + new Vector2(gap + c * (cell + gap), gap + r * (cell + gap));
-                var color = r == 1 ? Theme.Gold : (r + c) % 3 == 0 ? Theme.Blue : Theme.Rgba(52, 62, 92);
-                draw.AddRectFilled(min, min + new Vector2(cell), Theme.U32(color), cell * 0.3f);
-            }
-        }
-
-        ImGui.Dummy(new Vector2(size, size + Theme.S(4)));
     }
 }

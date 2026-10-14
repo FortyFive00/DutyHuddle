@@ -1,6 +1,7 @@
 using Dalamud.Configuration;
 using DutyHuddle.Domain.Analysis;
 using DutyHuddle.Domain.Duty;
+using DutyHuddle.Domain.Models;
 using DutyHuddle.Domain.Solver;
 
 namespace DutyHuddle.Configuration;
@@ -23,12 +24,15 @@ public sealed class DurationSampleData
 [Serializable]
 public sealed class PluginConfig : IPluginConfiguration
 {
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     public int Version { get; set; } = CurrentVersion;
 
     // Sharing with the party (opt-in). Turning the switch on is the consent: the text next to it says what is shared.
     public bool ShareWithParty { get; set; }
+
+    /// <summary>The welcome window asked about sharing once; it never asks again.</summary>
+    public bool SharingPromptAnswered { get; set; }
 
     /// <summary>Server override for advanced users; empty means the address built into the plugin.</summary>
     public string RelayUrl { get; set; } = string.Empty;
@@ -56,6 +60,9 @@ public sealed class PluginConfig : IPluginConfiguration
     public bool GroupCategories { get; set; } = true;
     public bool HideUniqueDuties { get; set; }
     public bool NotifyCommonDuty { get; set; } = true;
+
+    /// <summary>Odds and a shortcut drawn on the game's own Wondrous Tails journal.</summary>
+    public bool ShowJournalOverlay { get; set; } = true;
 
     // Sticker Advisor tab.
     public AdvisorGoal AdvisorGoal { get; set; } = AdvisorGoal.AtLeastOneLine;
@@ -97,9 +104,20 @@ public sealed class PluginConfig : IPluginConfiguration
         if (Version < 2)
             ShareWithParty = SyncEnabled && SyncConsentGiven;
 
+        // Players who already turned sharing on have nothing left to be asked.
+        if (Version < 3)
+            SharingPromptAnswered = ShareWithParty;
+
         Version = CurrentVersion;
         return true;
     }
+
+    /// <summary>Objectives the player marked as skipped in this journal.</summary>
+    public HashSet<int> SkippedFor(MemberId member, WtBoard board)
+        => SkippedObjectives.TryGetValue(SkipKey(member, board), out var list) ? [.. list] : [];
+
+    public static string SkipKey(MemberId member, WtBoard board)
+        => $"{member.Key}|{new DateTimeOffset(DateTime.SpecifyKind(board.ExpiresUtc, DateTimeKind.Utc)).ToUnixTimeSeconds()}";
 
     /// <summary>Drops per-journal entries whose journal has expired.</summary>
     public void PruneSkipped(DateTime nowUtc)

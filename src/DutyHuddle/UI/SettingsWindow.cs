@@ -69,6 +69,13 @@ public sealed class SettingsWindow : Window
             saveConfig();
         }
 
+        var overlay = config.ShowJournalOverlay;
+        if (Widgets.ToggleRow("##overlay", "Show odds on the game's Wondrous Tails journal", ref overlay))
+        {
+            config.ShowJournalOverlay = overlay;
+            saveConfig();
+        }
+
         ImGui.Spacing();
         Widgets.Text("Members with unknown status count as", Theme.TextMuted);
         var unknown = (float)config.UnknownWeight;
@@ -181,6 +188,7 @@ public sealed class SettingsWindow : Window
         config.GroupCategories = imported.GroupCategories;
         config.HideUniqueDuties = imported.HideUniqueDuties;
         config.NotifyCommonDuty = imported.NotifyCommonDuty;
+        config.ShowJournalOverlay = imported.ShowJournalOverlay;
         config.AdvisorGoal = imported.AdvisorGoal;
         config.HideReceivedChatCodes = imported.HideReceivedChatCodes;
     }

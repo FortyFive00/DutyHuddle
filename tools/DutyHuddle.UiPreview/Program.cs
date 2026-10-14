@@ -101,7 +101,66 @@ foreach (var (page, name, shareOn) in new[]
     Console.WriteLine($"Saved {path}");
 }
 
+// Party journals with another member's journal open (the popup is drawn as a plain window here).
+const System.Reflection.BindingFlags Private = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+var journalsPage = new WondrousTailsPage(ui, config, () => { }, catalog, repository.LoadExpansionNames(), finder, solvers);
+typeof(WondrousTailsPage).GetField("partySection", Private)!.SetValue(journalsPage, 1);
+var friend = analysis.Current.Journals.First(j => !j.IsLocal && j.Board is not null).Member;
+typeof(WondrousTailsPage).GetField("viewedMember", Private)!.SetValue(journalsPage, friend);
+var journalView = typeof(WondrousTailsPage).GetMethod("DrawJournalView", Private)!;
+Render("party-journals", 1000, 720, () =>
+{
+    Window("DutyHuddle###main", new Vector2(16), new Vector2(968, 688), ImGuiWindowFlags.NoCollapse, () => journalsPage.Draw(analysis.Current));
+    Window("##journalView", new Vector2(330, 260), null, ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.AlwaysAutoResize, () => journalView.Invoke(journalsPage, [analysis.Current]));
+});
+
+var welcomeConfig = new PluginConfig();
+var welcome = new WelcomeWindow(ui, welcomeConfig, () => { }, () => { });
+Render("welcome", 560, 330, () =>
+    Window("Welcome to DutyHuddle###welcome", new Vector2(16), null, ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.AlwaysAutoResize, welcome.Draw));
+
+var overlay = new JournalOverlay(null!, analysis, config, solvers, ui, () => { });
+Render("journal-overlay", 400, 200, () =>
+{
+    ImGui.SetNextWindowSizeConstraints(new Vector2(320, 0), new Vector2(320, float.MaxValue));
+    using var overlayStyle = new StyleScope()
+        .Var(ImGuiStyleVar.WindowPadding, Theme.S(10, 8))
+        .Var(ImGuiStyleVar.ItemSpacing, Theme.S(6, 5))
+        .Color(ImGuiCol.Border, Theme.Alpha(Theme.Gold, 0.45f));
+    Window("##overlay", new Vector2(16), null, ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.AlwaysAutoResize, overlay.DrawPanel);
+});
+
 return 0;
+
+void Window(string title, Vector2 position, Vector2? size, ImGuiWindowFlags flags, Action draw)
+{
+    ImGui.SetNextWindowPos(position);
+    if (size is { } fixedSize)
+        ImGui.SetNextWindowSize(fixedSize);
+    ImGui.Begin(title, flags | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings);
+    draw();
+    ImGui.End();
+}
+
+void Render(string name, int sceneWidth, int sceneHeight, Action draw)
+{
+    ImDrawDataPtr drawData = default;
+    for (var frame = 0; frame < 4; frame++)
+    {
+        io.DisplaySize = new Vector2(sceneWidth, sceneHeight);
+        ImGui.NewFrame();
+        using (Theme.PushWindowStyle())
+            draw();
+        ImGui.Render();
+        drawData = ImGui.GetDrawData();
+    }
+
+    var rasterizer = new Rasterizer(sceneWidth, sceneHeight, new Vector4(0.23f, 0.26f, 0.30f, 1f), textures);
+    rasterizer.Render(drawData);
+    var path = Path.Combine(output, $"{name}.png");
+    rasterizer.SavePng(path);
+    Console.WriteLine($"Saved {path}");
+}
 
 internal sealed class LuminaSheetSource(GameData game) : ISheetSource
 {

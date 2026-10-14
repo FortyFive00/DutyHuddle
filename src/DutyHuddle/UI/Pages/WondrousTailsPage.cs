@@ -27,6 +27,7 @@ public sealed class WondrousTailsPage
     private int expansionFilter = -1;
     private int partySection;
     private WtRankingRow? menuRow;
+    private MemberId? viewedMember;
 
     public WondrousTailsPage(
         Widgets ui,
@@ -213,34 +214,57 @@ public sealed class WondrousTailsPage
 
     private void DrawJournals(PartyView view)
     {
-        Widgets.Text("Click a member to see which objectives they still need.", Theme.TextMuted);
+        Widgets.Text("Click a member to see which objectives they still need, or the grid to see their journal.", Theme.TextMuted);
         ImGui.Spacing();
         var draw = ImGui.GetWindowDrawList();
         var lineHeight = ImGui.GetTextLineHeight();
         var avatar = Theme.S(28);
+        var rowHeight = avatar + Theme.S(12);
         foreach (var journal in view.Journals)
         {
             var member = view.Members.FirstOrDefault(m => m.Member == journal.Member) ?? new PartyMemberState(journal.Member, journal.IsLocal, null);
             var key = journal.Member.Key;
             var expanded = expandedJournals.Contains(key);
-            var (min, max, hovered, clicked) = Widgets.Row($"##journal{key}", avatar + Theme.S(12));
-            var centerY = (min.Y + max.Y) / 2;
+
+            // Right side, from the edge inwards: points, seals, bar, then the journal button for other members.
+            var rowMin = ImGui.GetCursorScreenPos();
+            var centerY = rowMin.Y + rowHeight / 2;
+            var right = rowMin.X + ImGui.GetContentRegionAvail().X - Theme.S(10);
+            var board = journal.Board;
+            var pointsText = board is null ? string.Empty : $"{board.SecondChancePoints} pts";
+            var pointsWidth = ImGui.CalcTextSize(pointsText).X;
+            var sealsX = right - pointsWidth - Theme.S(16) - ImGui.CalcTextSize("9/9").X;
+            var barWidth = Theme.S(90);
+            var barX = sealsX - Theme.S(8) - barWidth;
+
+            // Submitted before the row so it takes the hover and the click instead of the row.
+            var buttonSize = Theme.S(26);
+            var buttonMin = new Vector2(barX - Theme.S(12) - buttonSize, centerY - buttonSize / 2);
+            var showButton = board is not null && !journal.IsLocal;
+            var buttonHovered = false;
+            if (showButton)
+            {
+                ImGui.SetCursorScreenPos(buttonMin);
+                if (ImGui.InvisibleButton($"##viewJournal{key}", new Vector2(buttonSize)))
+                {
+                    viewedMember = journal.Member;
+                    ImGui.OpenPopup("##journalView");
+                }
+
+                buttonHovered = ImGui.IsItemHovered();
+                ImGui.SetCursorScreenPos(rowMin);
+            }
+
+            var (min, _, hovered, clicked) = Widgets.Row($"##journal{key}", rowHeight);
             ui.DrawAvatar(draw, new Vector2(min.X + Theme.S(6), centerY - avatar / 2), avatar, member);
             var name = journal.IsLocal ? journal.Member.Name + " (you)" : journal.Member.Name;
             draw.AddText(new Vector2(min.X + avatar + Theme.S(16), centerY - lineHeight / 2), Theme.U32(journal.IsLocal ? Theme.Gold : Theme.Text), name);
 
-            var right = max.X - Theme.S(10);
-            if (journal.Board is { } board)
+            if (board is not null)
             {
-                var pointsText = $"{board.SecondChancePoints} pts";
-                var pointsWidth = ImGui.CalcTextSize(pointsText).X;
                 draw.AddText(new Vector2(right - pointsWidth, centerY - lineHeight / 2), Theme.U32(Theme.TextMuted), pointsText);
-                var sealsText = $"{board.PlacedSeals}/9";
-                var sealsWidth = ImGui.CalcTextSize("9/9").X;
-                var sealsX = right - pointsWidth - Theme.S(16) - sealsWidth;
-                draw.AddText(new Vector2(sealsX, centerY - lineHeight / 2), Theme.U32(Theme.Text), sealsText);
-                var barWidth = Theme.S(90);
-                Widgets.DrawMiniBar(draw, new Vector2(sealsX - Theme.S(8) - barWidth, centerY - Theme.S(3)), new Vector2(barWidth, Theme.S(6)), board.PlacedSeals / 9f, Theme.Blue);
+                draw.AddText(new Vector2(sealsX, centerY - lineHeight / 2), Theme.U32(Theme.Text), $"{board.PlacedSeals}/9");
+                Widgets.DrawMiniBar(draw, new Vector2(barX, centerY - Theme.S(3)), new Vector2(barWidth, Theme.S(6)), board.PlacedSeals / 9f, Theme.Blue);
             }
             else
             {
@@ -248,14 +272,62 @@ public sealed class WondrousTailsPage
                 draw.AddText(new Vector2(right - ImGui.CalcTextSize(text).X, centerY - lineHeight / 2), Theme.U32(Theme.TextFaint), text);
             }
 
-            if (hovered && journal.Board is not null)
+            if (showButton)
+            {
+                DrawJournalButton(draw, buttonMin, buttonSize, buttonHovered);
+                if (buttonHovered)
+                    Widgets.TooltipNow($"See {journal.Member.Name}'s journal");
+            }
+
+            if (hovered && board is not null)
                 Widgets.TooltipNow(expanded ? "Click to hide objectives" : "Click to show objectives");
-            if (clicked && journal.Board is not null && !expandedJournals.Remove(key))
+            if (clicked && board is not null && !expandedJournals.Remove(key))
                 expandedJournals.Add(key);
 
-            if (expanded && journal.Board is not null)
+            if (expanded && board is not null)
                 DrawObjectives(journal);
         }
+
+        if (ImGui.BeginPopup("##journalView"))
+        {
+            DrawJournalView(view);
+            ImGui.EndPopup();
+        }
+    }
+
+    /// <summary>A small grid glyph: the journal button in a member row.</summary>
+    private static void DrawJournalButton(ImDrawListPtr draw, Vector2 min, float size, bool hovered)
+    {
+        draw.AddRectFilled(min, min + new Vector2(size), Theme.U32(hovered ? Theme.Alpha(Theme.Gold, 0.22f) : Theme.CardRaised), Theme.S(6));
+        var color = Theme.U32(hovered ? Theme.Gold : Theme.TextMuted);
+        var pad = size * 0.24f;
+        var gap = size * 0.06f;
+        var cell = (size - pad * 2 - gap * 3) / 4;
+        for (var i = 0; i < WtBoard.CellCount; i++)
+        {
+            var cellMin = min + new Vector2(pad + i % 4 * (cell + gap), pad + i / 4 * (cell + gap));
+            draw.AddRectFilled(cellMin, cellMin + new Vector2(cell), color, cell * 0.25f);
+        }
+    }
+
+    /// <summary>Another member's journal: where their seals are, nothing more.</summary>
+    private void DrawJournalView(PartyView view)
+    {
+        // Looked up every frame so the grid follows new data while it is open.
+        var journal = view.Journals.FirstOrDefault(j => j.Member == viewedMember);
+        if (journal?.Board is not { } board)
+        {
+            ImGui.CloseCurrentPopup();
+            return;
+        }
+
+        ui.Title(journal.Member.Name + "'s journal");
+        ImGui.Spacing();
+        DrawBoard(board, Theme.S(40));
+        ImGui.Spacing();
+        var lines = LineTable.CountLines(board.StickerMask);
+        var linesText = lines == 1 ? "1 line" : $"{lines} lines";
+        Widgets.Text($"{board.PlacedSeals}/9 seals · {linesText} · {board.SecondChancePoints} pts", Theme.TextMuted);
     }
 
     private void DrawObjectives(WtMemberView journal)
@@ -324,7 +396,7 @@ public sealed class WondrousTailsPage
             return;
         }
 
-        var result = StickerAdvisor.Advise(board, solver, Skipped(journal.Member, board), view.ComputedUtc);
+        var result = StickerAdvisor.Advise(board, solver, config.SkippedFor(journal.Member, board), view.ComputedUtc);
         DrawAdvice(result);
         ImGui.Spacing();
         DrawOdds(result, width);
@@ -462,7 +534,7 @@ public sealed class WondrousTailsPage
         if (open.Count == 0)
             return;
 
-        var key = SkipKey(journal.Member, board);
+        var key = PluginConfig.SkipKey(journal.Member, board);
         var skipped = config.SkippedObjectives.GetValueOrDefault(key) ?? [];
         if (!ImGui.CollapsingHeader($"Objectives you won't do ({skipped.Count} of {open.Count})"))
             return;
@@ -483,12 +555,6 @@ public sealed class WondrousTailsPage
             saveConfig();
         }
     }
-
-    private HashSet<int> Skipped(MemberId member, WtBoard board)
-        => config.SkippedObjectives.TryGetValue(SkipKey(member, board), out var list) ? [.. list] : [];
-
-    private static string SkipKey(MemberId member, WtBoard board)
-        => $"{member.Key}|{new DateTimeOffset(DateTime.SpecifyKind(board.ExpiresUtc, DateTimeKind.Utc)).ToUnixTimeSeconds()}";
 
     private bool Matches(WtRankingRow row, string text)
         => row.Label.Contains(text, StringComparison.OrdinalIgnoreCase)

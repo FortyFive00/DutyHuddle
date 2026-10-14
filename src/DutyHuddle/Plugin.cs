@@ -35,6 +35,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly DalamudUiAssets assets;
     private readonly MainWindow mainWindow;
     private readonly SettingsWindow settingsWindow;
+    private readonly JournalOverlay journalOverlay;
 
     public Plugin(
         IDalamudPluginInterface pluginInterface,
@@ -45,6 +46,7 @@ public sealed class Plugin : IDalamudPlugin
         IPartyList partyList,
         IDataManager dataManager,
         IDutyState dutyState,
+        IGameGui gameGui,
         IAddonLifecycle addonLifecycle,
         ITextureProvider textures,
         INotificationManager notifications,
@@ -86,6 +88,7 @@ public sealed class Plugin : IDalamudPlugin
         assets = new DalamudUiAssets(pluginInterface.UiBuilder, textures);
         var ui = new Widgets(assets);
         var dutyFinder = new DutyFinderLauncher(framework);
+        var solvers = new SolverCache(log);
         var sharing = new SharingFacade(sync, chatCodes, store);
         settingsWindow = new SettingsWindow(ui, config, SaveConfig, catalog);
         var view = new MainView(
@@ -94,14 +97,16 @@ public sealed class Plugin : IDalamudPlugin
             SaveConfig,
             sharing,
             new RoulettePage(ui, config, SaveConfig, dutyFinder, history),
-            new WondrousTailsPage(ui, config, SaveConfig, catalog, data.LoadExpansionNames(), dutyFinder, new SolverCache(log)),
+            new WondrousTailsPage(ui, config, SaveConfig, catalog, data.LoadExpansionNames(), dutyFinder, solvers),
             new SharingPage(ui, config, SaveConfig, sharing),
             () => settingsWindow.IsOpen = true);
         mainWindow = new MainWindow(analysis, view, assets);
         windows.AddWindow(mainWindow);
         windows.AddWindow(settingsWindow);
+        windows.AddWindow(new WelcomeWindow(ui, config, SaveConfig, OpenMain));
+        journalOverlay = new JournalOverlay(gameGui, analysis, config, solvers, ui, () => OpenMain(MainView.WondrousTailsPage));
 
-        pluginInterface.UiBuilder.Draw += windows.Draw;
+        pluginInterface.UiBuilder.Draw += OnDraw;
         pluginInterface.UiBuilder.OpenMainUi += ToggleMain;
         pluginInterface.UiBuilder.OpenConfigUi += ToggleSettings;
         commands.AddHandler(Command, new CommandInfo(OnCommand)
@@ -115,7 +120,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         framework.Update -= OnFrameworkUpdate;
         commands.RemoveHandler(Command);
-        pluginInterface.UiBuilder.Draw -= windows.Draw;
+        pluginInterface.UiBuilder.Draw -= OnDraw;
         pluginInterface.UiBuilder.OpenMainUi -= ToggleMain;
         pluginInterface.UiBuilder.OpenConfigUi -= ToggleSettings;
         windows.RemoveAllWindows();
@@ -133,7 +138,8 @@ public sealed class Plugin : IDalamudPlugin
     private void OnFrameworkUpdate(IFramework _)
     {
         var now = DateTime.UtcNow;
-        snapshots.Tick(now, mainWindow.IsOpen);
+        // The game's journal open counts as looking: placed seals show up in the overlay within seconds.
+        snapshots.Tick(now, mainWindow.IsOpen || journalOverlay.IsJournalOpen);
         sync.Tick(now, mainWindow.IsOpen);
     }
 
@@ -156,6 +162,27 @@ public sealed class Plugin : IDalamudPlugin
             snapshots.RequestRefresh();
             sync.RequestPoll();
         }
+    }
+
+    private void OpenMain() => OpenMain(config.SelectedPage);
+
+    private void OpenMain(int page)
+    {
+        if (config.SelectedPage != page)
+        {
+            config.SelectedPage = page;
+            SaveConfig();
+        }
+
+        if (!mainWindow.IsOpen)
+            ToggleMain();
+        mainWindow.BringToFront();
+    }
+
+    private void OnDraw()
+    {
+        windows.Draw();
+        journalOverlay.Draw();
     }
 
     private void ToggleSettings() => settingsWindow.Toggle();

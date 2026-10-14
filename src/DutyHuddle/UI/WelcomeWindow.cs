@@ -41,7 +41,7 @@ public sealed class WelcomeWindow : Window
     public override void Draw()
     {
         var width = Theme.S(440);
-        Widgets.Logo(Theme.S(30));
+        ui.Logo(Theme.S(30));
         ImGui.SameLine(0, Theme.S(10));
         ImGui.BeginGroup();
         ui.Title("DutyHuddle", Theme.Gold);

@@ -463,7 +463,7 @@ public sealed class WondrousTailsPage
             AdvisorAction.UseRetry => (Theme.Amber, FontAwesomeIcon.Redo),
             AdvisorAction.CompleteBook => (Theme.Gold, FontAwesomeIcon.FlagCheckered),
             AdvisorAction.Continue => (Theme.Green, FontAwesomeIcon.ArrowRight),
-            AdvisorAction.NotWorthTheRisk => (Theme.TextMuted, FontAwesomeIcon.ShieldAlt),
+            AdvisorAction.DontShuffle => (Theme.TextMuted, FontAwesomeIcon.ShieldAlt),
             _ => (Theme.TextMuted, FontAwesomeIcon.InfoCircle),
         };
 
@@ -503,9 +503,13 @@ public sealed class WondrousTailsPage
         var labelWidth = width * 0.43f;
         var column = (width - labelWidth) / 3;
         var start = ImGui.GetCursorPosX();
+        // Column headers on their own line: the eyebrow is wider than the label column in a narrow window.
         foreach (var (header, index) in new[] { ("1+ line", 0), ("2+ lines", 1), ("3 lines", 2) })
         {
-            ImGui.SameLine(start + labelWidth + column * index);
+            if (index == 0)
+                ImGui.SetCursorPosX(start + labelWidth);
+            else
+                ImGui.SameLine(start + labelWidth + column * index);
             Widgets.Text(header, Theme.TextFaint);
         }
 

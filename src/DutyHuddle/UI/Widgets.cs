@@ -152,23 +152,19 @@ public sealed class Widgets
         return clicked;
     }
 
-    /// <summary>The DutyHuddle mark: a tiny Wondrous Tails board with one golden line.</summary>
-    public static void Logo(float size)
+    /// <summary>The DutyHuddle logo; until the image has loaded, a drawn stand-in of the same size.</summary>
+    public void Logo(float size)
     {
         var origin = ImGui.GetCursorScreenPos() + new Vector2(0, Theme.S(4));
         var draw = ImGui.GetWindowDrawList();
-        draw.AddRectFilled(origin, origin + new Vector2(size), Theme.U32(Theme.Rgba(26, 34, 56)), size * 0.22f);
-        var gap = size * 0.06f;
-        var cell = (size - gap * 5) / 4;
-        for (var r = 0; r < 4; r++)
+        if (Assets.GetLogo(size) is var (logo, pixels))
         {
-            for (var c = 0; c < 4; c++)
-            {
-                var min = origin + new Vector2(gap + c * (cell + gap), gap + r * (cell + gap));
-                var color = r == 1 ? Theme.Gold : (r + c) % 3 == 0 ? Theme.Blue : Theme.Rgba(52, 62, 92);
-                draw.AddRectFilled(min, min + new Vector2(cell), Theme.U32(color), cell * 0.3f);
-            }
+            // Native size on whole pixels: one texel per pixel, so nothing gets blurred.
+            var min = new Vector2(MathF.Round(origin.X + (size - pixels) / 2), MathF.Round(origin.Y + (size - pixels) / 2));
+            draw.AddImage(logo, min, min + new Vector2(pixels));
         }
+        else
+            draw.AddRectFilled(origin, origin + new Vector2(size), Theme.U32(Theme.Rgba(24, 32, 54)), size * 0.22f);
 
         ImGui.Dummy(new Vector2(size, size + Theme.S(4)));
     }

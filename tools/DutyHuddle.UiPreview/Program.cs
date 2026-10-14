@@ -122,7 +122,7 @@ Render("welcome", 560, 330, () =>
 var overlay = new JournalOverlay(null!, analysis, config, solvers, ui, () => { });
 Render("journal-overlay", 400, 200, () =>
 {
-    ImGui.SetNextWindowSizeConstraints(new Vector2(320, 0), new Vector2(320, float.MaxValue));
+    ImGui.SetNextWindowSizeConstraints(new Vector2(350, 0), new Vector2(350, float.MaxValue));
     using var overlayStyle = new StyleScope()
         .Var(ImGuiStyleVar.WindowPadding, Theme.S(10, 8))
         .Var(ImGuiStyleVar.ItemSpacing, Theme.S(6, 5))
@@ -240,6 +240,24 @@ internal sealed unsafe class PreviewAssets : IUiAssets
         return result;
     }
 
+    public (ImTextureID Texture, int Size)? GetLogo(float pixels)
+    {
+        var folder = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "DutyHuddle", "images", "logo");
+        if (LogoSizes.Closest(LogoSizes.In(folder), pixels) is not { } size)
+            return null;
+
+        var key = 0xFFFF0000u | (uint)size;
+        if (!icons.TryGetValue(key, out var cached))
+        {
+            var (w, h, rgba) = Png.ReadRgba(Path.Combine(folder, $"{size}.png"));
+            var handle = nextHandle++;
+            textures[handle] = new CpuTexture(w, h, rgba);
+            icons[key] = cached = new ImTextureID(handle);
+        }
+
+        return cached is { } texture ? (texture, size) : null;
+    }
+
     public IDisposable IconFont() => Push(iconFont);
 
     public IDisposable TitleFont() => Push(titleFont);
@@ -344,5 +362,75 @@ internal static class Scenario
             SecondChancePoints = points,
             ExpiresUtc = now.AddDays(5).AddHours(7),
         };
+    }
+}
+
+/// <summary>Just enough PNG decoding for the logo: 8-bit RGBA, not interlaced.</summary>
+internal static class Png
+{
+    public static (int Width, int Height, byte[] Rgba) ReadRgba(string path)
+    {
+        var bytes = File.ReadAllBytes(path);
+        int width = 0, height = 0;
+        using var idat = new MemoryStream();
+        for (var offset = 8; offset < bytes.Length;)
+        {
+            var length = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(bytes.AsSpan(offset));
+            var type = System.Text.Encoding.ASCII.GetString(bytes, offset + 4, 4);
+            var data = bytes.AsSpan(offset + 8, length);
+            if (type == "IHDR")
+            {
+                width = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(data);
+                height = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(data[4..]);
+                if (data[8] != 8 || data[9] != 6 || data[12] != 0)
+                    throw new NotSupportedException("Only 8-bit RGBA, non-interlaced PNG files are supported.");
+            }
+            else if (type == "IDAT")
+            {
+                idat.Write(data);
+            }
+
+            offset += length + 12;
+        }
+
+        idat.Position = 0;
+        using var inflated = new MemoryStream();
+        using (var zlib = new System.IO.Compression.ZLibStream(idat, System.IO.Compression.CompressionMode.Decompress))
+            zlib.CopyTo(inflated);
+        var raw = inflated.ToArray();
+
+        var stride = width * 4;
+        var rgba = new byte[height * stride];
+        for (var y = 0; y < height; y++)
+        {
+            var filter = raw[y * (stride + 1)];
+            for (var x = 0; x < stride; x++)
+            {
+                int a = x >= 4 ? rgba[y * stride + x - 4] : 0;
+                int b = y > 0 ? rgba[(y - 1) * stride + x] : 0;
+                int c = x >= 4 && y > 0 ? rgba[(y - 1) * stride + x - 4] : 0;
+                int value = raw[y * (stride + 1) + 1 + x];
+                value += filter switch
+                {
+                    1 => a,
+                    2 => b,
+                    3 => (a + b) / 2,
+                    4 => Paeth(a, b, c),
+                    _ => 0,
+                };
+                rgba[y * stride + x] = (byte)value;
+            }
+        }
+
+        return (width, height, rgba);
+    }
+
+    private static int Paeth(int a, int b, int c)
+    {
+        var p = a + b - c;
+        var pa = Math.Abs(p - a);
+        var pb = Math.Abs(p - b);
+        var pc = Math.Abs(p - c);
+        return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
     }
 }

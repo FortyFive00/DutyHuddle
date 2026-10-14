@@ -10,7 +10,7 @@ public enum AdvisorAction
     Continue,
     UseShuffle,
     UseRetry,
-    NotWorthTheRisk,
+    DontShuffle,
 }
 
 /// <summary>
@@ -60,7 +60,7 @@ public static class StickerAdvisor
             return Simple(AdvisorAction.JournalExpired, "Journal expired", "Hand it to Khloe to receive a new one.");
 
         if (board.IsComplete)
-            return Simple(AdvisorAction.CompleteBook, "Complete the book",
+            return Simple(AdvisorAction.CompleteBook, "Turn in the journal",
                 $"All 9 seals are placed ({LineTable.CountLines(board.StickerMask)} line(s)). Turn the journal in to Khloe.");
 
         var retry = RetryPlan.Create(board, skippedObjectives);
@@ -75,7 +75,7 @@ public static class StickerAdvisor
 
         if (retry.RetryNow)
         {
-            return new AdvisorResult(AdvisorAction.UseRetry, "Use Retry",
+            return new AdvisorResult(AdvisorAction.UseRetry, "Use Retry now",
                 "Pick a completed objective you can repeat quickly. All open objectives are ones you skip, so the Retry is a guaranteed extra seal.",
                 evaluation, retry, pointsForShuffle, warnings);
         }
@@ -85,20 +85,20 @@ public static class StickerAdvisor
         {
             if (evaluation.ShuffleValue is { } shuffle && shuffle > evaluation.PlaceValue + ShuffleMargin)
             {
-                return new AdvisorResult(AdvisorAction.UseShuffle, "Use Shuffle",
+                return new AdvisorResult(AdvisorAction.UseShuffle, "Shuffle now",
                     Describe("Shuffling now", evaluation.ShuffleNow!.Value, "continuing", evaluation.PlaceNext, solver.Goal),
                     evaluation, retry, pointsForShuffle, warnings);
             }
 
-            return new AdvisorResult(AdvisorAction.NotWorthTheRisk, "Not worth the risk",
-                "Your current layout is at least as good as a random one. Keep your points and continue.",
+            return new AdvisorResult(AdvisorAction.DontShuffle, "Don't Shuffle, keep going",
+                "Shuffling would not improve your odds: your layout is at least as good as a random one. Keep your points and keep clearing objectives.",
                 evaluation, retry, pointsForShuffle, warnings);
         }
 
         var detail = board.ClaimableCount > 0
             ? $"Affix your {board.ClaimableCount} claimable seal(s), then keep clearing objectives."
             : $"Clear {retry.SealsNeeded} more objective(s) to finish the journal.";
-        return new AdvisorResult(AdvisorAction.Continue, "Continue normally", detail, evaluation, retry, pointsForShuffle, warnings);
+        return new AdvisorResult(AdvisorAction.Continue, "Keep going", detail, evaluation, retry, pointsForShuffle, warnings);
     }
 
     /// <summary>Percentage with a dot as decimal separator, whatever the system culture (the UI is English).</summary>

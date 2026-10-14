@@ -85,7 +85,7 @@ public sealed class Plugin : IDalamudPlugin
         ipc = new IpcProvider(pluginInterface, store, analysis);
         store.Changed += OnStoreChanged;
 
-        assets = new DalamudUiAssets(pluginInterface.UiBuilder, textures);
+        assets = new DalamudUiAssets(pluginInterface.UiBuilder, textures, pluginInterface.AssemblyLocation.DirectoryName!);
         var ui = new Widgets(assets);
         var dutyFinder = new DutyFinderLauncher(framework);
         var solvers = new SolverCache(log);

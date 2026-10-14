@@ -69,7 +69,7 @@ public sealed class MainView
     private void DrawHeader(PartyView view)
     {
         var startY = ImGui.GetCursorPosY();
-        Widgets.Logo(Theme.S(30));
+        ui.Logo(Theme.S(30));
         ImGui.SameLine(0, Theme.S(10));
         ImGui.BeginGroup();
         ui.Title("DutyHuddle", Theme.Gold);

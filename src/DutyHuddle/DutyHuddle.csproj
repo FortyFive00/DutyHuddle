@@ -10,6 +10,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- icon.png is the installer icon. The logo comes in many exact sizes: ImGui samples a scaled image too coarsely to look sharp. -->
+    <Content Include="images\icon.png;images\logo\*.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\DutyHuddle.Domain\DutyHuddle.Domain.csproj" />
   </ItemGroup>
 

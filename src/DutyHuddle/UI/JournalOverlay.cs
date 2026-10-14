@@ -19,7 +19,7 @@ public sealed class JournalOverlay
     // Free space on the left page, under the objective description, as fractions of the addon size.
     private const float AnchorX = 0.055f;
     private const float AnchorBottom = 0.955f;
-    private const float PanelWidth = 0.37f;
+    private const float PanelWidth = 0.40f;
 
     private readonly IGameGui gameGui;
     private readonly AnalysisService analysis;
@@ -69,59 +69,52 @@ public sealed class JournalOverlay
     /// <summary>The panel's content, drawn inside the overlay window (or a preview).</summary>
     public void DrawPanel()
     {
-        var width = ImGui.GetContentRegionAvail().X;
-        Widgets.Logo(Theme.S(16));
-        ImGui.SameLine(0, Theme.S(6));
-        Widgets.Text("DutyHuddle", Theme.Gold);
-
         var view = analysis.Current;
         var journal = view.Journals.FirstOrDefault(j => j.IsLocal);
         var solver = solvers.TryGet(config.AdvisorGoal);
-        if (journal?.Board is not { } board)
+        var result = journal?.Board is { } current && solver is not null
+            ? StickerAdvisor.Advise(current, solver, config.SkippedFor(journal.Member, current), view.ComputedUtc)
+            : null;
+
+        // Top line: the advice, and the shortcut to the plugin on the right.
+        var startY = ImGui.GetCursorPosY();
+        var buttonWidth = ui.ButtonWidth(FontAwesomeIcon.BookOpen, "Open");
+        ImGui.SetCursorPosY(startY + (ImGui.GetFrameHeight() - ImGui.GetTextLineHeight()) / 2);
+        var status = journal?.Board is null ? "Reading your journal..." : result is null ? "Calculating odds..." : result.Headline;
+        Widgets.Text(status, result is null ? Theme.TextMuted : Theme.Gold);
+        ImGui.SameLine(ImGui.GetWindowContentRegionMax().X - buttonWidth);
+        ImGui.SetCursorPosY(startY);
+        if (ui.Button("overlayOpen", FontAwesomeIcon.BookOpen, "Open", primary: true))
+            openJournalPage();
+        Widgets.Tooltip("Open Wondrous Tails in DutyHuddle");
+
+        if (result is null || journal?.Board is not { } board)
+            return;
+
+        // Bottom line: the odds of playing on optimally, label then value.
+        if (result.Evaluation is { } evaluation)
         {
-            Widgets.Text("Reading your journal...", Theme.TextMuted);
-        }
-        else if (solver is null)
-        {
-            Widgets.Text("Calculating odds...", Theme.TextMuted);
+            var odds = evaluation.Optimal;
+            var start = ImGui.GetCursorPosX();
+            var column = ImGui.GetContentRegionAvail().X / 3;
+            Odds("1+", odds.AtLeastOne, 1);
+            ImGui.SameLine(start + column);
+            Odds("2+", odds.AtLeastTwo, 1);
+            ImGui.SameLine(start + column * 2);
+            Odds("3", odds.Three, 2);
         }
         else
         {
-            var result = StickerAdvisor.Advise(board, solver, config.SkippedFor(journal.Member, board), view.ComputedUtc);
-            ImGui.SameLine();
-            var headlineWidth = ImGui.CalcTextSize(result.Headline).X;
-            ImGui.SetCursorPosX(Math.Max(ImGui.GetCursorPosX(), ImGui.GetWindowContentRegionMax().X - headlineWidth));
-            Widgets.Text(result.Headline, Theme.Text);
-
-            if (result.Evaluation is { } evaluation)
-            {
-                var odds = evaluation.Optimal;
-                var column = width / 3;
-                var start = ImGui.GetCursorPosX();
-                Odds("1+ line", odds.AtLeastOne, 1, start);
-                ImGui.SameLine(start + column);
-                Odds("2+ lines", odds.AtLeastTwo, 1, start + column);
-                ImGui.SameLine(start + column * 2);
-                Odds("3 lines", odds.Three, 2, start + column * 2);
-            }
-            else
-            {
-                var lines = LineTable.CountLines(board.StickerMask);
-                Widgets.Text(lines == 1 ? "Journal complete: 1 line" : $"Journal complete: {lines} lines", Theme.TextMuted);
-            }
+            var lines = LineTable.CountLines(board.StickerMask);
+            Widgets.Text(lines == 1 ? "Journal complete: 1 line" : $"Journal complete: {lines} lines", Theme.TextMuted);
         }
-
-        if (ui.Button("overlayOpen", FontAwesomeIcon.BookOpen, "Open in DutyHuddle", primary: true, width: width))
-            openJournalPage();
     }
 
-    /// <summary>One odds column: the label above, the percentage below.</summary>
-    private static void Odds(string label, double value, int decimals, float x)
+    /// <summary>One odds column: "2+ lines 15.3%".</summary>
+    private static void Odds(string lines, double value, int decimals)
     {
-        ImGui.BeginGroup();
-        Widgets.Text(label, Theme.TextFaint);
-        ImGui.SetCursorPosX(x);
-        Widgets.Text(StickerAdvisor.Percent(value, decimals), Theme.Gold);
-        ImGui.EndGroup();
+        Widgets.Text(lines == "1+" ? "1+ line" : $"{lines} lines", Theme.TextFaint);
+        ImGui.SameLine(0, Theme.S(5));
+        Widgets.Text(StickerAdvisor.Percent(value, decimals), Theme.Text);
     }
 }

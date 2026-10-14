@@ -26,6 +26,7 @@ public sealed class SyncService : IDisposable
 {
     private static readonly TimeSpan PollWhileOpen = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan PollInBackground = TimeSpan.FromMinutes(5);
+    // Keeps the slot alive on the server, which deletes it 2 hours after the last update: stay well under that.
     private static readonly TimeSpan Republish = TimeSpan.FromMinutes(30);
 
     private readonly PluginConfig config;

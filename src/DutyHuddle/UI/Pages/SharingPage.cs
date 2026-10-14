@@ -56,7 +56,7 @@ public sealed class SharingPage
         ui.Title("Share with my party");
         Widgets.Wrapped(
             "Party members who also use DutyHuddle see your daily roulettes and your Wondrous Tails journal, and you see theirs. " +
-            "Nothing else is shared. The data is encrypted, so not even the sharing server can read it, and it is deleted after 36 hours.",
+            "Nothing else is shared. The data is encrypted, so not even the sharing server can read it, and it is deleted two hours after your last update.",
             Theme.TextMuted);
         ImGui.Spacing();
 

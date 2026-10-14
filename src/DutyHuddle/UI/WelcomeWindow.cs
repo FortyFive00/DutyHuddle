@@ -53,7 +53,7 @@ public sealed class WelcomeWindow : Window
         Widgets.Text("Share with your party?", Theme.Text);
         Widgets.Text(
             "Party members who also use DutyHuddle then see your daily roulettes and your Wondrous Tails journal, and you see theirs. " +
-            "Nothing else is shared. The data is encrypted, so not even the sharing server can read it, and it is deleted after 36 hours.",
+            "Nothing else is shared. The data is encrypted, so not even the sharing server can read it, and it is deleted two hours after your last update.",
             Theme.TextMuted);
         ImGui.PopTextWrapPos();
         ImGui.Spacing();

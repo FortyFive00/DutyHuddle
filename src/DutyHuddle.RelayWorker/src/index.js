@@ -6,12 +6,13 @@
 //   GET /v1/health                      {status:"ok"}
 // Rooms and slots are 32 hex characters chosen by the clients (hashes). The server only ever stores
 // ciphertext: it cannot read names, worlds, IDs or game data. Each room is one Durable Object; slots
-// expire 36 hours after their last update and an alarm deletes empty rooms.
+// expire 2 hours after their last update (clients republish every 30 minutes while in a party)
+// and an alarm deletes empty rooms.
 
 const HEX_ID = /^[0-9a-f]{32}$/;
 const MAX_BLOB_BYTES = 512;
 const MAX_SLOTS_PER_ROOM = 16;
-const SLOT_TTL_MS = 36 * 60 * 60 * 1000;
+const SLOT_TTL_MS = 2 * 60 * 60 * 1000;
 
 export default {
   async fetch(request, env) {

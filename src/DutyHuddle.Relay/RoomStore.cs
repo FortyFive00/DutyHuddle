@@ -4,7 +4,7 @@ namespace DutyHuddle.Relay;
 
 public sealed class RelayOptions
 {
-    public TimeSpan SlotTimeToLive { get; set; } = TimeSpan.FromHours(36);
+    public TimeSpan SlotTimeToLive { get; set; } = TimeSpan.FromHours(2);
     public int MaxBlobBytes { get; set; } = 512;
     public int MaxSlotsPerRoom { get; set; } = 16;
     public int MaxRooms { get; set; } = 200_000;

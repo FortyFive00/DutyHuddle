@@ -68,6 +68,25 @@ public sealed unsafe class RouletteReader
         return !anyInstance;
     }
 
+    /// <summary>Lines for /dutyhuddle debug: what the plugin sees for the Mentor roulette.</summary>
+    public IEnumerable<string> DescribeMentor(DutyCatalog catalog)
+    {
+        var roulette = catalog.Roulettes.FirstOrDefault(r => r.IsMentorOnly);
+        if (roulette is null)
+        {
+            yield return "No Mentor roulette in the catalog.";
+            yield break;
+        }
+
+        var pool = catalog.GetPool(roulette).Where(d => d.InstanceContentId != 0).ToList();
+        var locked = pool.Where(d => !UIState.IsInstanceContentUnlocked(d.InstanceContentId)).ToList();
+        yield return $"Mentor status: {IsRouletteMentor()} | pool {pool.Count} | locked {locked.Count} | v{typeof(RouletteReader).Assembly.GetName().Version}";
+        foreach (var duty in locked.Take(25))
+            yield return $"  locked: {duty.Name} (ic {duty.InstanceContentId})";
+        if (locked.Count > 25)
+            yield return $"  ... and {locked.Count - 25} more";
+    }
+
     /// <summary>The Mentor roulette can only be queued once every duty in its pool is unlocked.</summary>
     private static bool HasUnlockedAllDuties(DutyCatalog catalog, RouletteInfo roulette)
     {

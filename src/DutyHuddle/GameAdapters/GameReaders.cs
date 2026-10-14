@@ -32,7 +32,7 @@ public sealed unsafe class RouletteReader
                 continue;
             }
 
-            var unlocked = roulette.IsMentorOnly ? IsRouletteMentor() : HasUnlockedDuty(catalog, roulette);
+            var unlocked = roulette.IsMentorOnly ? IsRouletteMentor() && HasUnlockedAllDuties(catalog, roulette) : HasUnlockedDuty(catalog, roulette);
             if (!unlocked)
             {
                 result[roulette.Id] = Availability.Locked;
@@ -66,6 +66,18 @@ public sealed unsafe class RouletteReader
         }
 
         return !anyInstance;
+    }
+
+    /// <summary>The Mentor roulette can only be queued once every duty in its pool is unlocked.</summary>
+    private static bool HasUnlockedAllDuties(DutyCatalog catalog, RouletteInfo roulette)
+    {
+        foreach (var duty in catalog.GetPool(roulette))
+        {
+            if (duty.InstanceContentId != 0 && !UIState.IsInstanceContentUnlocked(duty.InstanceContentId))
+                return false;
+        }
+
+        return true;
     }
 
     /// <summary>

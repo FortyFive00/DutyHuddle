@@ -32,7 +32,7 @@ public sealed unsafe class RouletteReader
                 continue;
             }
 
-            var unlocked = roulette.IsMentorOnly ? IsRouletteMentor() && HasUnlockedAllDuties(catalog, roulette) : HasUnlockedDuty(catalog, roulette);
+            var unlocked = roulette.IsMentorOnly ? IsRouletteMentor() && HasCompletedAllDuties(catalog, roulette) : HasUnlockedDuty(catalog, roulette);
             if (!unlocked)
             {
                 result[roulette.Id] = Availability.Locked;
@@ -79,20 +79,23 @@ public sealed unsafe class RouletteReader
         }
 
         var pool = catalog.GetPool(roulette).Where(d => d.InstanceContentId != 0).ToList();
-        var locked = pool.Where(d => !UIState.IsInstanceContentUnlocked(d.InstanceContentId)).ToList();
-        yield return $"Mentor status: {IsRouletteMentor()} | pool {pool.Count} | locked {locked.Count} | v{typeof(RouletteReader).Assembly.GetName().Version}";
-        foreach (var duty in locked.Take(25))
-            yield return $"  locked: {duty.Name} (ic {duty.InstanceContentId})";
-        if (locked.Count > 25)
-            yield return $"  ... and {locked.Count - 25} more";
+        var missing = pool.Where(d => !UIState.IsInstanceContentCompleted(d.InstanceContentId)).ToList();
+        yield return $"Mentor status: {IsRouletteMentor()} | pool {pool.Count} | not completed {missing.Count} | v{typeof(RouletteReader).Assembly.GetName().Version}";
+        foreach (var duty in missing.Take(25))
+            yield return $"  not completed: {duty.Name} (ic {duty.InstanceContentId})";
+        if (missing.Count > 25)
+            yield return $"  ... and {missing.Count - 25} more";
     }
 
-    /// <summary>The Mentor roulette can only be queued once every duty in its pool is unlocked.</summary>
-    private static bool HasUnlockedAllDuties(DutyCatalog catalog, RouletteInfo roulette)
+    /// <summary>
+    /// The Mentor roulette can only be queued once every duty in its pool has been completed
+    /// (the Duty Finder lists the missing ones under "Completion of the Following").
+    /// </summary>
+    private static bool HasCompletedAllDuties(DutyCatalog catalog, RouletteInfo roulette)
     {
         foreach (var duty in catalog.GetPool(roulette))
         {
-            if (duty.InstanceContentId != 0 && !UIState.IsInstanceContentUnlocked(duty.InstanceContentId))
+            if (duty.InstanceContentId != 0 && !UIState.IsInstanceContentCompleted(duty.InstanceContentId))
                 return false;
         }
 

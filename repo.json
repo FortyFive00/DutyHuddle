@@ -3,7 +3,7 @@
     "Author": "DutyHuddle",
     "Name": "DutyHuddle",
     "InternalName": "DutyHuddle",
-    "AssemblyVersion": "0.1.3.0",
+    "AssemblyVersion": "0.1.4.0",
     "Description": "Compare daily roulettes and Wondrous Tails with your party, and get advice on your journal.",
     "ApplicableVersion": "any",
     "RepoUrl": "https://github.com/FortyFive00/DutyHuddle",
@@ -29,6 +29,6 @@
     "DownloadLinkUpdate": "https://github.com/FortyFive00/DutyHuddle/releases/latest/download/latest.zip",
     "DownloadLinkTesting": "https://github.com/FortyFive00/DutyHuddle/releases/latest/download/latest.zip",
     "IsTestingExclusive": false,
-    "LastUpdate": 1791970304
+    "LastUpdate": 1791970511
   }
 ]

@@ -130,11 +130,11 @@ public class AnalysisTests
         var engine = new RecommendationEngine(catalog, resolver, durations);
         var members = new[]
         {
-            Roulettes("A", (1, Availability.Completed), (2, Availability.Available), (6, Availability.Available), (15, Availability.Available), (9, Availability.Locked)),
-            Roulettes("B", (1, Availability.Available), (2, Availability.Completed), (6, Availability.Available), (15, Availability.Available), (9, Availability.Locked)),
-            Roulettes("C", (1, Availability.Available), (2, Availability.Available), (6, Availability.Available), (15, Availability.Completed), (9, Availability.Available)),
-            Roulettes("D", (1, Availability.Available), (2, Availability.Available), (6, Availability.Available), (15, Availability.Available), (9, Availability.Locked)),
-            Roulettes("E", (1, Availability.Available), (2, Availability.Available), (6, Availability.Available), (15, Availability.Available), (9, Availability.Locked)),
+            Roulettes("A", (1, Availability.Completed), (2, Availability.Available), (6, Availability.Available), (15, Availability.Available)),
+            Roulettes("B", (1, Availability.Available), (2, Availability.Completed), (6, Availability.Available), (15, Availability.Available)),
+            Roulettes("C", (1, Availability.Available), (2, Availability.Available), (6, Availability.Available), (15, Availability.Completed)),
+            Roulettes("D", (1, Availability.Available), (2, Availability.Available), (6, Availability.Available), (15, Availability.Available)),
+            Roulettes("E", (1, Availability.Available), (2, Availability.Available), (6, Availability.Available), (15, Availability.Available)),
         };
 
         var grid = RouletteAnalyzer.BuildGrid(catalog, members, Epoch);
@@ -143,7 +143,6 @@ public class AnalysisTests
         // Five members cannot queue a 4-player roulette; Trials (5/5) beats Alliance Raids (4/5).
         Assert.Equal(6u, ranked[0].Row.Roulette.Id);
         Assert.False(ranked.Single(r => r.Row.Roulette.Id == 1).PartyCanQueue);
-        Assert.Equal("Solo queue only", ranked.Single(r => r.Row.Roulette.Id == 9).Reason);
         Assert.Equal(0, ranked.Single(r => r.Row.Roulette.Id == 2).Score);
     }
 

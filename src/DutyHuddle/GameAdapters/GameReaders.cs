@@ -13,13 +13,6 @@ public sealed record PartyMemberInfo(MemberId Id, ulong ContentId, bool IsLocal,
 /// <summary>Reads today's roulette completion for the local player. Call on the framework thread.</summary>
 public sealed unsafe class RouletteReader
 {
-    private readonly IPlayerState player;
-
-    public RouletteReader(IPlayerState player)
-    {
-        this.player = player;
-    }
-
     public Dictionary<uint, Availability> Read(DutyCatalog catalog)
     {
         var result = new Dictionary<uint, Availability>();
@@ -32,8 +25,7 @@ public sealed unsafe class RouletteReader
                 continue;
             }
 
-            var unlocked = roulette.IsMentorOnly ? IsRouletteMentor() && HasCompletedAllDuties(catalog, roulette) : HasUnlockedDuty(catalog, roulette);
-            if (!unlocked)
+            if (!HasUnlockedDuty(catalog, roulette))
             {
                 result[roulette.Id] = Availability.Locked;
                 continue;
@@ -66,53 +58,6 @@ public sealed unsafe class RouletteReader
         }
 
         return !anyInstance;
-    }
-
-    /// <summary>Lines for /dutyhuddle debug: what the plugin sees for the Mentor roulette.</summary>
-    public IEnumerable<string> DescribeMentor(DutyCatalog catalog)
-    {
-        var roulette = catalog.Roulettes.FirstOrDefault(r => r.IsMentorOnly);
-        if (roulette is null)
-        {
-            yield return "No Mentor roulette in the catalog.";
-            yield break;
-        }
-
-        var pool = catalog.GetPool(roulette).Where(d => d.InstanceContentId != 0).ToList();
-        var missing = pool.Where(d => !UIState.IsInstanceContentCompleted(d.InstanceContentId)).ToList();
-        yield return $"Mentor status: {IsRouletteMentor()} | pool {pool.Count} | not completed {missing.Count} | v{typeof(RouletteReader).Assembly.GetName().Version}";
-        foreach (var duty in missing.Take(25))
-            yield return $"  not completed: {duty.Name} (ic {duty.InstanceContentId})";
-        if (missing.Count > 25)
-            yield return $"  ... and {missing.Count - 25} more";
-    }
-
-    /// <summary>
-    /// The Mentor roulette can only be queued once every duty in its pool has been completed
-    /// (the Duty Finder lists the missing ones under "Completion of the Following").
-    /// </summary>
-    private static bool HasCompletedAllDuties(DutyCatalog catalog, RouletteInfo roulette)
-    {
-        foreach (var duty in catalog.GetPool(roulette))
-        {
-            if (duty.InstanceContentId != 0 && !UIState.IsInstanceContentCompleted(duty.InstanceContentId))
-                return false;
-        }
-
-        return true;
-    }
-
-    /// <summary>
-    /// The Mentor roulette needs a battle (PvE) or PvP mentor; a trade mentor alone does not unlock it,
-    /// so the generic IsMentor check would be wrong.
-    /// </summary>
-    private bool IsRouletteMentor()
-    {
-        if (player.IsBattleMentor)
-            return true;
-
-        var state = PlayerState.Instance();
-        return state is not null && state->IsPlayerStateFlagSet(PlayerStateFlag.IsPvPMentorStatusActive);
     }
 }
 

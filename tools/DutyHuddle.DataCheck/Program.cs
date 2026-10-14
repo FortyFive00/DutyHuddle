@@ -29,29 +29,6 @@ foreach (var roulette in catalog.Roulettes)
     Console.WriteLine($"  {roulette.Id,3} {roulette.Name,-40} party<= {roulette.MembersPerParty,-2} pool {pool,3} icon {roulette.IconId} pvp {roulette.IsPvP}");
 }
 
-var mentor = catalog.Roulettes.FirstOrDefault(r => r.IsMentorOnly);
-if (mentor is not null)
-{
-    Console.WriteLine();
-    Console.WriteLine("Mentor pool:");
-    foreach (var duty in catalog.GetPool(mentor).OrderBy(d => d.InstanceContentId))
-        Console.WriteLine($"  cfc {duty.Id,4} ic {duty.InstanceContentId,5} {duty.Name}  [{duty.Roulettes}]");
-}
-
-foreach (var id in new uint[] { 1, 9, 15 })
-{
-    var row = game.GetExcelSheet<ContentRoulette>()!.GetRow(id);
-    Console.WriteLine();
-    Console.WriteLine($"ContentRoulette {id} {row.Category.ExtractText()} openrule={row.OpenRule.RowId} instance={row.InstanceContent.RowId}");
-    var rule = row.OpenRule.ValueNullable;
-    if (rule is not null)
-        foreach (var prop in typeof(ContentRouletteOpenRule).GetProperties())
-        {
-            if (prop.GetIndexParameters().Length > 0 || prop.Name is "ExcelPage" or "RowOffset") continue;
-            try { Console.WriteLine($"  rule.{prop.Name} = {prop.GetValue(rule)}"); } catch { }
-        }
-}
-
 Console.WriteLine();
 Console.WriteLine("Wondrous Tails objectives:");
 var problems = 0;

@@ -35,8 +35,6 @@ public sealed class Plugin : IDalamudPlugin
     private readonly DalamudUiAssets assets;
     private readonly MainWindow mainWindow;
     private readonly SettingsWindow settingsWindow;
-    private readonly IChatGui chat;
-    private readonly Func<IEnumerable<string>> describeMentor;
 
     public Plugin(
         IDalamudPluginInterface pluginInterface,
@@ -56,7 +54,6 @@ public sealed class Plugin : IDalamudPlugin
         this.pluginInterface = pluginInterface;
         this.commands = commands;
         this.framework = framework;
-        this.chat = chat;
 
         config = pluginInterface.GetPluginConfig() as PluginConfig ?? new PluginConfig();
         config.PruneSkipped(DateTime.UtcNow);
@@ -70,9 +67,7 @@ public sealed class Plugin : IDalamudPlugin
 
         store = new PartyStateStore();
         var partyScanner = new PartyScanner(playerState, partyList);
-        var rouletteReader = new RouletteReader(playerState);
-        describeMentor = () => rouletteReader.DescribeMentor(catalog);
-        snapshots = new SnapshotService(playerState, catalog, partyScanner, rouletteReader, new WondrousTailsReader(), store, log);
+        snapshots = new SnapshotService(playerState, catalog, partyScanner, new RouletteReader(), new WondrousTailsReader(), store, log);
         history = new HistoryService(pluginInterface.ConfigDirectory.FullName, log);
         snapshots.LocalChanged += history.Record;
 
@@ -149,12 +144,6 @@ public sealed class Plugin : IDalamudPlugin
     {
         if (arguments.Trim().Equals("settings", StringComparison.OrdinalIgnoreCase))
             ToggleSettings();
-        else if (arguments.Trim().Equals("debug", StringComparison.OrdinalIgnoreCase))
-            framework.RunOnFrameworkThread(() =>
-            {
-                foreach (var line in describeMentor())
-                    chat.Print(line, "DutyHuddle");
-            });
         else
             ToggleMain();
     }

@@ -84,6 +84,10 @@ public sealed class GameDataRepository
             if (row.CompletionArrayIndex < 0 || !row.IsInDutyFinder || row.Name.IsEmpty)
                 continue;
 
+            // Solo-only roulettes (Mentor) can never be run as a party, which is all this plugin is about.
+            if (row.ContentMemberType.ValueNullable?.MembersPerParty == 1)
+                continue;
+
             var pool = PoolByRoulette.GetValueOrDefault(row.RowId);
 
             // Icon: the content type most common in the roulette's pool (dungeon, trial, raid...).
@@ -104,7 +108,6 @@ public sealed class GameDataRepository
                 RequiredLevel = row.RequiredLevel,
                 MembersPerParty = row.ContentMemberType.ValueNullable?.MembersPerParty ?? 0,
                 IsPvP = row.IsPvP,
-                IsMentorOnly = pool == RoulettePool.Mentor,
                 TomestoneReward = row.RewardTomeA + row.RewardTomeB + row.RewardTomeC,
                 Pool = pool,
                 SortKey = row.SortKey,

@@ -51,7 +51,6 @@ internal static class TestCatalog
             new() { Id = 2, Name = "Duty Roulette: High-level Dungeons", MembersPerParty = 4, Pool = RoulettePool.HighLevel, SortKey = 2 },
             new() { Id = 6, Name = "Duty Roulette: Trials", MembersPerParty = 8, Pool = RoulettePool.Trial, SortKey = 5 },
             new() { Id = 7, Name = "Daily Challenge: Frontline", MembersPerParty = 4, Pool = RoulettePool.Frontline, IsPvP = true, SortKey = 6 },
-            new() { Id = 9, Name = "Duty Roulette: Mentor", MembersPerParty = 1, Pool = RoulettePool.Mentor, IsMentorOnly = true, SortKey = 9 },
             new() { Id = 15, Name = "Duty Roulette: Alliance Raids", MembersPerParty = 8, Pool = RoulettePool.Alliance, SortKey = 10 },
         ];
 

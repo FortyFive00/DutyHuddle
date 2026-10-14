@@ -60,7 +60,6 @@ public sealed record RouletteInfo
     public byte MembersPerParty { get; init; }
 
     public bool IsPvP { get; init; }
-    public bool IsMentorOnly { get; init; }
     public int TomestoneReward { get; init; }
     public RoulettePool Pool { get; init; }
     public byte SortKey { get; init; }
